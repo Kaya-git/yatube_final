@@ -97,6 +97,7 @@ class PostPagesTests(TestCase):
         self.user = User.objects.create_user(username=TEST_USERNAME_USER)
         self.authorized_client = Client()
         self.authorized_client.force_login(self.author)
+
     @classmethod
     def tearDownClass(cls):
         super().tearDownClass()
@@ -201,6 +202,7 @@ class PostPagesTests(TestCase):
             with self.subTest(value=value):
                 form_field = response.context['form'].fields[value]
                 self.assertIsInstance(form_field, expected)
+
     def index_test_cache(self):
         """Посты кешируются на 20 сек"""
         response = self.authorized_client.get(reverse('posts:index'))
