@@ -18,7 +18,6 @@ ALLOWED_HOSTS = [
 
 
 INSTALLED_APPS = [
-    'django_extensions',
     'about.apps.AboutConfig',
     'core.apps.CoreConfig',
     'users.apps.UsersConfig',
