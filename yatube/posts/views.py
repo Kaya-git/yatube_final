@@ -9,9 +9,9 @@ LIMIT_POST = 10
 
 
 def paginator(request, queryset):
-    paginator = Paginator(queryset, LIMIT_POST)
+    pagin_obj = Paginator(queryset, LIMIT_POST)
     page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = pagin_obj.get_page(page_number)
     return page_obj
 
 
