@@ -203,6 +203,51 @@ class PostPagesTests(TestCase):
                 form_field = response.context['form'].fields[value]
                 self.assertIsInstance(form_field, expected)
 
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
+class PostCacheTest(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
+        POSTS_AMOUNT = 13
+
+        cls.author = User.objects.create(username=TEST_USERNAME_AUTHOR)
+
+        cls.image = SimpleUploadedFile(
+            name='small.gif',
+            content=SMALL_GIF,
+            content_type='image/gif'
+        )
+
+        cls.posts = [
+            Post(text=f'Test text {i+1}', author=cls.author, image=cls.image)
+            for i in range(POSTS_AMOUNT)
+        ]
+
+        Post.objects.bulk_create(cls.posts)
+
+        cls.group = Group.objects.create(
+            title=TEST_TITLE,
+            slug=TEST_SLUG,
+        )
+
+        cls.group2 = Group.objects.create(
+            title=TEST_TITLE_2,
+            slug=TEST_SLUG_2,
+        )
+
+    def setUp(self):
+        self.guest_client = Client()
+        self.user = User.objects.create_user(username=TEST_USERNAME_USER)
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.author)
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
+
     def index_test_cache(self):
         """Посты кешируются на 20 сек"""
         response = self.authorized_client.get(reverse('posts:index'))
@@ -215,20 +260,110 @@ class PostPagesTests(TestCase):
         posts_amount_clear = len(response.context['page_obj'])
         self.assertEqual(posts_amount, posts_amount_clear)
 
-    def authorized_client_follow_unfollow_author(self):
-        """Авторизованный клиент фоловит и анфоловит автора"""
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
+class PostFollowingTest(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
+        POSTS_AMOUNT = 13
+
+        cls.author = User.objects.create(username=TEST_USERNAME_AUTHOR)
+
+        cls.image = SimpleUploadedFile(
+            name='small.gif',
+            content=SMALL_GIF,
+            content_type='image/gif'
+        )
+
+        cls.posts = [
+            Post(text=f'Test text {i+1}', author=cls.author, image=cls.image)
+            for i in range(POSTS_AMOUNT)
+        ]
+
+        Post.objects.bulk_create(cls.posts)
+
+        cls.group = Group.objects.create(
+            title=TEST_TITLE,
+            slug=TEST_SLUG,
+        )
+
+        cls.group2 = Group.objects.create(
+            title=TEST_TITLE_2,
+            slug=TEST_SLUG_2,
+        )
+
+    def setUp(self):
+        self.guest_client = Client()
+        self.user = User.objects.create_user(username=TEST_USERNAME_USER)
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.author)
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
+
+    def authorized_client_follow_author(self):
+        """Авторизованный клиент фоловит автора"""
+
+        response_follow = self.authorized_client.get(
+            reverse('post:profile_follow',
+                    kwargs={'username': TEST_USERNAME_AUTHOR}))
+
+        self.assertEqual(
+            response_follow.context.get('author').username,
+            TEST_USERNAME_AUTHOR
+        )
+        self.assertEqual(
+            response_follow.context.get('user').username,
+            self.user
+        )
+
+    def authorized_client_unfollow_author(self):
+        """Авторизованный клиент анфоловит автора"""
         Follow.objects.get_or_create(
             author=TEST_USERNAME_AUTHOR_2,
             user=self.user,
         )
-        response_follow = self.authorized_client.get(
-            reverse('post:profile_follow',
-                    kwargs={'username': TEST_USERNAME_AUTHOR}))
-        follows_amount = len(response_follow.follow)
-        self.assertEqual(follows_amount, 2)
         response_unfollow = self.authorized_client.get(
             reverse('post:profile_unfollow',
                     kwargs={'username': TEST_USERNAME_AUTHOR_2})
         )
         unfollows_amount = len(response_unfollow.follow)
-        self.assertEqual(unfollows_amount, 1)
+        self.assertEqual(unfollows_amount, 0)
+
+    def author_post_is_in_the_user_list(self):
+        """Пост автора появляется в ленте подписанного пользователя"""
+        Follow.objects.get_or_create(
+            author=TEST_USERNAME_AUTHOR_2,
+            user=self.user,
+        )
+        response_is_in_the_list = self.authorized_client.get(
+            reverse('post:follow_index')
+        )
+        follow_obj = response_is_in_the_list.context['page_obj'][0]
+        follow_obj_author = follow_obj.author
+        follow_obj_follower = follow_obj.user
+
+        self.assertEqual(follow_obj_author, TEST_USERNAME_AUTHOR_2)
+        self.assertEqual(follow_obj_follower, self.user)
+
+    def author_post_is_not_in_the_not_followers_list(self):
+        """Пост автора не появляется в ленте у не подписанного пользователя"""
+        Follow.objects.get_or_create(
+            author=TEST_USERNAME_AUTHOR_2,
+            user=TEST_USERNAME_USER,
+        )
+
+        response_is_not_in_the_list = self.authorized_client.get(
+            reverse('post:follow_index')
+        )
+
+        follow_obj = response_is_not_in_the_list.context['page_obj'][0]
+        follow_obj_author = follow_obj.author
+        follow_obj_follower = follow_obj.user
+
+        self.assertNotEqual(follow_obj_author, TEST_USERNAME_AUTHOR_2)
+        self.assertNotEqual(follow_obj_follower, self.user)
