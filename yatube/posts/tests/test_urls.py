@@ -124,7 +124,7 @@ class PostsURLTests(TestCase):
     def test_comments_auth_user(self):
         """Тест доступности коментирования поста авторизованому пользователю"""
         response = self.authorized_client.get(f'/posts/{POST_ID}/comment/')
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
 
     def test_error_page(self):
         """Тест статуса ответа сервера
