@@ -1,6 +1,5 @@
 from django.contrib import admin
-
-from .models import Comment, Group, Post
+from .models import Post, Group, Comment
 
 
 @admin.register(Post)
